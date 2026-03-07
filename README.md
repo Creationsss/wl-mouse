@@ -10,6 +10,50 @@ BEAST MINI PRO, BEAST X PRO, BEAST X, BEAST MAX, BEAST MINI, SWORD X, YING, STRI
 
 Download a prebuilt binary from [releases](https://heliopolis.live/creations/wl-mouse/-/releases).
 
+### Nix (Flakes)
+
+#### Run without installing
+
+```bash
+nix run git+https://heliopolis.live/creations/wl-mouse.git -- --help
+```
+
+#### Development Shell
+
+Includes all system dependencies and Python libraries:
+
+```bash
+nix develop
+wl-mouse --help
+```
+
+#### Install to user profile
+
+```bash
+nix profile install git+https://heliopolis.live/creations/wl-mouse.git
+```
+
+#### Add to NixOS Configuration (recommended)
+
+```nix
+# In your flake.nix or configuration.nix
+{
+  inputs.wl-mouse.url = "git+https://heliopolis.live/creations/wl-mouse.git";
+
+  outputs = { self, nixpkgs, wl-mouse, ... }: {
+    nixosConfigurations.your-hostname = nixpkgs.lib.nixosSystem {
+      modules = [
+        ({ pkgs, ... }: {
+          environment.systemPackages = [
+            wl-mouse.packages.${pkgs.system}.default
+          ];
+        })
+      ];
+    };
+  };
+}
+```
+
 Or build from source:
 
 ```
