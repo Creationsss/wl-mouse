@@ -43,6 +43,13 @@ fn main() -> Result<()> {
 			|d, p, v| d.set_ripple_control(p, v),
 		),
 		Commands::SleepTime { minutes } => cmd_sleep_time(cli.device.as_deref(), minutes),
+		Commands::Wrap {
+			rate,
+			dpi,
+			lod,
+			debounce,
+			command,
+		} => cmd_wrap(cli.device.as_deref(), rate, dpi, lod, debounce, &command),
 		Commands::Reset => cmd_reset(cli.device.as_deref()),
 	}
 }
@@ -308,6 +315,100 @@ fn cmd_sleep_time(path: Option<&str>, minutes: Option<u16>) -> Result<()> {
 		}
 	}
 	Ok(())
+}
+
+fn cmd_wrap(
+	path: Option<&str>,
+	rate: Option<u16>,
+	dpi: Option<u16>,
+	lod: Option<f32>,
+	debounce: Option<u8>,
+	command: &[String],
+) -> Result<()> {
+	let rate = rate.or(if dpi.is_none() && lod.is_none() && debounce.is_none() {
+		Some(8000)
+	} else {
+		None
+	});
+
+	if let Some(r) = rate {
+		if !matches!(r, 125 | 250 | 500 | 1000 | 2000 | 4000 | 8000) {
+			bail!("invalid polling rate: {r} (valid: 125/250/500/1000/2000/4000/8000)");
+		}
+	}
+	if let Some(v) = lod {
+		let valid = [0.7_f32, 1.0, 2.0];
+		if !valid.iter().any(|&x| (x - v).abs() < 0.01) {
+			bail!("invalid LOD: {v} (valid: 0.7, 1, 2)");
+		}
+	}
+
+	let dev = Device::open(path)?;
+	let profile = dev.active_profile()?;
+
+	let orig_rate = rate.map(|_| dev.polling_rate(profile)).transpose()?;
+	let orig_dpi = dpi.map(|_| dev.dpi_stages(profile, 6)).transpose()?;
+	let orig_lod = lod.map(|_| dev.lod(profile)).transpose()?;
+	let orig_debounce = debounce.map(|_| dev.debounce(profile)).transpose()?;
+
+	if let (Some(r), Some(orig)) = (rate, orig_rate) {
+		if orig != r {
+			dev.set_polling_rate(profile, r)?;
+			eprintln!("Polling rate: {orig} -> {r} Hz");
+		}
+	}
+	let mut dpi_changed = false;
+	if let (Some(d), Some((active, ref stages))) = (dpi, &orig_dpi) {
+		let current = stages.get(*active as usize).map(|s| s.0).unwrap_or(0);
+		if current != d {
+			let new_stages: Vec<(u16, u16)> = stages.iter().map(|_| (d, d)).collect();
+			dev.set_dpi_stages(profile, &new_stages)?;
+			eprintln!("DPI: {current} -> {d}");
+			dpi_changed = true;
+		}
+	}
+	if let (Some(v), Some(orig)) = (lod, orig_lod) {
+		if (orig - v).abs() > 0.01 {
+			dev.set_lod(profile, v)?;
+			eprintln!("LOD: {orig}mm -> {v}mm");
+		}
+	}
+	if let (Some(d), Some(orig)) = (debounce, orig_debounce) {
+		if orig != d {
+			dev.set_debounce(profile, d)?;
+			eprintln!("Debounce: {orig}ms -> {d}ms");
+		}
+	}
+
+	let status = std::process::Command::new(&command[0])
+		.args(&command[1..])
+		.status();
+
+	if let (Some(orig), Some(r)) = (orig_rate, rate) {
+		if orig != r {
+			dev.set_polling_rate(profile, orig)?;
+			eprintln!("Polling rate restored: {orig} Hz");
+		}
+	}
+	if let (Some((_, ref stages)), true) = (&orig_dpi, dpi_changed) {
+		dev.set_dpi_stages(profile, stages)?;
+		eprintln!("DPI stages restored");
+	}
+	if let (Some(orig), Some(v)) = (orig_lod, lod) {
+		if (orig - v).abs() > 0.01 {
+			dev.set_lod(profile, orig)?;
+			eprintln!("LOD restored: {orig}mm");
+		}
+	}
+	if let (Some(orig), Some(d)) = (orig_debounce, debounce) {
+		if orig != d {
+			dev.set_debounce(profile, orig)?;
+			eprintln!("Debounce restored: {orig}ms");
+		}
+	}
+
+	let code = status?.code().unwrap_or(1);
+	std::process::exit(code);
 }
 
 fn cmd_reset(path: Option<&str>) -> Result<()> {

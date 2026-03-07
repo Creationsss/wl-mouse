@@ -78,6 +78,20 @@ pub enum Commands {
 		minutes: Option<u16>,
 	},
 
+	#[command(about = "Apply settings, run a command, then restore")]
+	Wrap {
+		#[arg(short, long, help = "Polling rate in Hz (default: 8000)")]
+		rate: Option<u16>,
+		#[arg(long, help = "DPI value")]
+		dpi: Option<u16>,
+		#[arg(long, help = "LOD value (0.7, 1, 2)")]
+		lod: Option<f32>,
+		#[arg(long, help = "Debounce time in ms")]
+		debounce: Option<u8>,
+		#[arg(trailing_var_arg = true, required = true)]
+		command: Vec<String>,
+	},
+
 	#[command(about = "Factory reset the device")]
 	Reset,
 }
