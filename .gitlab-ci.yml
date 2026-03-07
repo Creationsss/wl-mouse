@@ -1,0 +1,73 @@
+stages:
+  - quality
+  - release
+
+variables:
+  CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
+
+fmt:
+  image: rust:latest
+  stage: quality
+  before_script:
+    - rustup component add rustfmt
+  script:
+    - cargo fmt --check --verbose
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_MERGE_REQUEST_ID
+
+clippy:
+  image: rust:latest
+  stage: quality
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq pkg-config libudev-dev
+    - rustup component add clippy
+  script:
+    - cargo clippy -- -D warnings
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_MERGE_REQUEST_ID
+  cache:
+    key: ${CI_JOB_NAME}
+    paths:
+      - target/
+      - .cargo/
+
+build-release:
+  image: rust:latest
+  stage: release
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq pkg-config libudev-dev
+  script:
+    - cargo build --release
+    - strip target/release/wl-mouse
+    - mv target/release/wl-mouse wl-mouse-linux-x86_64
+  artifacts:
+    paths:
+      - wl-mouse-linux-x86_64
+  rules:
+    - if: $CI_COMMIT_TAG
+  cache:
+    key: ${CI_JOB_NAME}
+    paths:
+      - target/
+      - .cargo/
+
+release:
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  stage: release
+  needs:
+    - job: build-release
+      artifacts: true
+  script:
+    - echo "Creating release for ${CI_COMMIT_TAG}"
+  release:
+    tag_name: ${CI_COMMIT_TAG}
+    name: "${CI_COMMIT_TAG}"
+    description: "Release ${CI_COMMIT_TAG}"
+    assets:
+      links:
+        - name: wl-mouse-linux-x86_64
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/wl-mouse-linux-x86_64?job=build-release"
+  rules:
+    - if: $CI_COMMIT_TAG

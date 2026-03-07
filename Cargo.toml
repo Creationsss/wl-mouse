@@ -1,0 +1,13 @@
+[package]
+name = "wl-mouse"
+version = "0.1.0"
+edition = "2021"
+description = "CLI tool for WLmouse gaming mice (Beast X Mini Pro, etc.)"
+license = "AGPL-3.0-or-later"
+keywords = ["usb", "mouse", "hid", "wlmouse", "gaming"]
+categories = ["command-line-utilities", "hardware-support"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+hidapi = "2"
+anyhow = "1"
