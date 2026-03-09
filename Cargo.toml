@@ -1,6 +1,6 @@
 [package]
 name = "wl-mouse"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "CLI tool for WLmouse gaming mice (Beast X Mini Pro, etc.)"
 license = "AGPL-3.0-or-later"

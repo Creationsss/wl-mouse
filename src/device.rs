@@ -36,6 +36,13 @@ pub fn list_devices() -> Result<Vec<(String, u16, String)>> {
 
 	found.sort_by_key(|f| f.1);
 	found.dedup_by(|a, b| a.1 == b.1);
+
+	let wired_pids: Vec<u16> = found.iter().map(|f| f.1).collect();
+	found.retain(|f| {
+		let is_dongle = f.1 % 2 == 0;
+		!is_dongle || !wired_pids.contains(&(f.1 + 1))
+	});
+
 	Ok(found)
 }
 

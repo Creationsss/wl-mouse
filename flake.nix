@@ -26,7 +26,7 @@ description = "CLI tool for WLmouse gaming mice. Configure DPI, polling rate, LO
         {
           wl-mouse = pkgs.rustPlatform.buildRustPackage {
             pname = "wl-mouse";
-            version = "0.1.1";
+            version = "0.1.2;
 
             src = ./.;
 
@@ -51,7 +51,7 @@ description = "CLI tool for WLmouse gaming mice. Configure DPI, polling rate, LO
       devShells = forAllSystems (system:
         let
           pkgs = pkgsFor system;
-          
+
           rustToolchain = pkgs.rust-bin.stable."1.92.0".default.override {
             extensions = [ "rust-src" "rust-analyzer" ];
           };
