@@ -6,6 +6,9 @@ pub struct Cli {
 	#[arg(short, long, help = "HID device path (auto-detects if not specified)")]
 	pub device: Option<String>,
 
+	#[arg(short, long, help = "Output in JSON format")]
+	pub json: bool,
+
 	#[command(subcommand)]
 	pub command: Commands,
 }
