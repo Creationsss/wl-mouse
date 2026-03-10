@@ -29,3 +29,7 @@ pub const KNOWN_PIDS: &[(u16, &str)] = &[
 	(0xA871, "BEAST X PRO (wired)"),
 	(0xA870, "BEAST X PRO (dongle)"),
 ];
+
+pub const SLEEP_OFF: u16 = 0x0000;
+pub const SLEEP_DISABLED: u16 = 0xFF00; // 65280 (turbo mode)
+pub const SLEEP_MAX_VAL: u16 = 0xFFFF; // 65535
