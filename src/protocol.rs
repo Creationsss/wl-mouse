@@ -155,11 +155,11 @@ pub fn build_get_battery() -> [u8; REPORT_SIZE] {
 
 pub fn parse_battery(resp: &[u8; REPORT_SIZE], hid_index: u8) -> (u8, bool) {
 	let idx = (7 - hid_index) as usize;
-	let (percent, charging_raw) = (resp[idx], resp[idx + 1]);
-	if percent == 0 && charging_raw > 1 {
-		(charging_raw, false)
+	let (a, b) = (resp[idx], resp[idx + 1]);
+	if a > 1 {
+		(a, b != 0)
 	} else {
-		(percent, charging_raw != 0)
+		(b, a != 0)
 	}
 }
 

@@ -2,6 +2,7 @@ mod cli;
 mod consts;
 mod device;
 mod protocol;
+mod types;
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -10,6 +11,7 @@ use serde::Serialize;
 use cli::{Cli, Commands, DpiAction};
 use consts::*;
 use device::Device;
+use types::*;
 
 fn print_output<T: Serialize>(data: T, json: bool, plain_printer: impl FnOnce(T)) -> Result<()> {
 	if json {
@@ -18,52 +20,6 @@ fn print_output<T: Serialize>(data: T, json: bool, plain_printer: impl FnOnce(T)
 		plain_printer(data);
 	}
 	Ok(())
-}
-
-#[derive(Serialize)]
-struct DeviceListItem {
-	name: String,
-	pid: u16,
-	path: String,
-}
-
-#[derive(Serialize)]
-struct DeviceInfo {
-	name: String,
-	firmware: String,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	dongle_firmware: Option<String>,
-	battery_percent: Option<u8>,
-	charging: Option<bool>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	serial_number: Option<String>,
-	active_profile: u8,
-}
-
-#[derive(Serialize)]
-struct DpiStage {
-	x: u16,
-	y: u16,
-	active: bool,
-}
-
-#[derive(Serialize)]
-struct ProfileInfo {
-	id: u8,
-	polling_rate_hz: u16,
-	dpi_stages: Vec<DpiStage>,
-	lod_mm: f32,
-	debounce_ms: u8,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	angle_snap: Option<bool>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	motion_sync: Option<bool>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	angle_tune: Option<i8>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	ripple_control: Option<bool>,
-	#[serde(skip_serializing_if = "Option::is_none")]
-	sleep_time_seconds: Option<u16>,
 }
 
 fn main() -> Result<()> {
@@ -191,28 +147,14 @@ fn cmd_profile(path: Option<&str>, id: Option<u8>, json: bool) -> Result<()> {
 	let info = ProfileInfo {
 		id: profile,
 		polling_rate_hz: rate,
-		dpi_stages: stages
-			.iter()
-			.enumerate()
-			.map(|(i, (x, y))| DpiStage {
-				x: *x,
-				y: *y,
-				active: i as u8 == active_stage,
-			})
-			.collect(),
+		dpi_stages: dpi_stages_from_raw(active_stage, &stages),
 		lod_mm: lod,
 		debounce_ms: debounce,
 		angle_snap: snap,
 		motion_sync: sync,
 		angle_tune: tune,
 		ripple_control: ripple,
-		sleep_time_seconds: sleep.map(|s| {
-			if s == SLEEP_OFF || s >= SLEEP_DISABLED {
-				0
-			} else {
-				s
-			}
-		}),
+		sleep_time_seconds: sleep.map(normalize_sleep_time),
 	};
 
 	print_output(info, json, |info| {
@@ -265,15 +207,7 @@ fn cmd_dpi(path: Option<&str>, action: Option<DpiAction>, json: bool) -> Result<
 	match action {
 		None => {
 			let (active, stages) = dev.dpi_stages(profile, 6)?;
-			let list: Vec<DpiStage> = stages
-				.iter()
-				.enumerate()
-				.map(|(i, (x, y))| DpiStage {
-					x: *x,
-					y: *y,
-					active: i as u8 == active,
-				})
-				.collect();
+			let list = dpi_stages_from_raw(active, &stages);
 
 			print_output(list, json, |stages| {
 				for (i, stage) in stages.iter().enumerate() {
@@ -445,11 +379,7 @@ fn cmd_sleep_time(path: Option<&str>, minutes: Option<u16>, json: bool) -> Resul
 	match minutes {
 		None => {
 			let secs = dev.sleep_time(profile)?;
-			let val = if secs == SLEEP_OFF || secs >= SLEEP_DISABLED {
-				0
-			} else {
-				secs
-			};
+			let val = normalize_sleep_time(secs);
 			print_output(
 				serde_json::json!({ "sleep_time_seconds": val }),
 				json,
