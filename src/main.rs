@@ -220,11 +220,12 @@ fn cmd_dpi(path: Option<&str>, action: Option<DpiAction>, json: bool) -> Result<
 				}
 			})
 		}
-		Some(DpiAction::Set { stage, dpi, y_dpi }) => {
+		Some(DpiAction::Set { dpi, stage, y_dpi }) => {
+			let (active, mut stages) = dev.dpi_stages(profile, 6)?;
+			let stage = stage.unwrap_or(active + 1);
 			if !(1..=6).contains(&stage) {
 				bail!("stage must be 1-6");
 			}
-			let (_, mut stages) = dev.dpi_stages(profile, 6)?;
 			let idx = (stage - 1) as usize;
 			if idx >= stages.len() {
 				bail!(

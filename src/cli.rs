@@ -101,12 +101,12 @@ pub enum Commands {
 
 #[derive(Subcommand)]
 pub enum DpiAction {
-	#[command(about = "Set DPI for a stage (e.g. dpi set 1 800)")]
+	#[command(about = "Set DPI (e.g. dpi set 1600 or dpi set -s 2 800)")]
 	Set {
-		#[arg(help = "Stage number (1-6)")]
-		stage: u8,
 		#[arg(help = "DPI value")]
 		dpi: u16,
+		#[arg(short, long, help = "Stage number (1-6, default: active stage)")]
+		stage: Option<u8>,
 		#[arg(short, long, help = "Also set Y-axis DPI separately")]
 		y_dpi: Option<u16>,
 	},
