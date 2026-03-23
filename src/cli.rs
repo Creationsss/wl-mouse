@@ -91,6 +91,12 @@ pub enum Commands {
 		lod: Option<f32>,
 		#[arg(long, help = "Debounce time in ms")]
 		debounce: Option<u8>,
+		#[arg(
+			short,
+			long,
+			help = "Only apply settings while window is focused (Hyprland)"
+		)]
+		focus: bool,
 		#[arg(trailing_var_arg = true, required = true)]
 		command: Vec<String>,
 	},

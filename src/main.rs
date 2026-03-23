@@ -1,6 +1,7 @@
 mod cli;
 mod consts;
 mod device;
+mod hyprland;
 mod protocol;
 mod types;
 
@@ -64,8 +65,17 @@ fn main() -> Result<()> {
 			dpi,
 			lod,
 			debounce,
+			focus,
 			command,
-		} => cmd_wrap(cli.device.as_deref(), rate, dpi, lod, debounce, &command),
+		} => cmd_wrap(
+			cli.device.as_deref(),
+			rate,
+			dpi,
+			lod,
+			debounce,
+			focus,
+			&command,
+		),
 		Commands::Reset => cmd_reset(cli.device.as_deref()),
 	}
 }
@@ -420,6 +430,7 @@ fn cmd_wrap(
 	dpi: Option<u16>,
 	lod: Option<f32>,
 	debounce: Option<u8>,
+	focus: bool,
 	command: &[String],
 ) -> Result<()> {
 	let rate = rate.or(if dpi.is_none() && lod.is_none() && debounce.is_none() {
@@ -448,64 +459,127 @@ fn cmd_wrap(
 	let orig_lod = lod.map(|_| dev.lod(profile)).transpose()?;
 	let orig_debounce = debounce.map(|_| dev.debounce(profile)).transpose()?;
 
-	if let (Some(r), Some(orig)) = (rate, orig_rate) {
-		if orig != r {
-			dev.set_polling_rate(profile, r)?;
-			eprintln!("Polling rate: {orig} -> {r} Hz");
+	let apply = |label: &str| -> Result<bool> {
+		let mut changed = false;
+		if let (Some(r), Some(orig)) = (rate, orig_rate) {
+			if orig != r {
+				dev.set_polling_rate(profile, r)?;
+				eprintln!("{label}: Polling rate: {orig} -> {r} Hz");
+				changed = true;
+			}
 		}
-	}
-	let mut dpi_changed = false;
-	if let (Some(d), Some((active, ref stages))) = (dpi, &orig_dpi) {
-		let current = stages.get(*active as usize).map(|s| s.0).unwrap_or(0);
-		if current != d {
-			let new_stages: Vec<(u16, u16)> = stages.iter().map(|_| (d, d)).collect();
-			dev.set_dpi_stages(profile, &new_stages)?;
-			eprintln!("DPI: {current} -> {d}");
-			dpi_changed = true;
+		if let (Some(d), Some((active, ref stages))) = (dpi, &orig_dpi) {
+			let current = stages.get(*active as usize).map(|s| s.0).unwrap_or(0);
+			if current != d {
+				let new_stages: Vec<(u16, u16)> = stages.iter().map(|_| (d, d)).collect();
+				dev.set_dpi_stages(profile, &new_stages)?;
+				eprintln!("{label}: DPI: {current} -> {d}");
+				changed = true;
+			}
 		}
-	}
-	if let (Some(v), Some(orig)) = (lod, orig_lod) {
-		if (orig - v).abs() > 0.01 {
-			dev.set_lod(profile, v)?;
-			eprintln!("LOD: {orig}mm -> {v}mm");
+		if let (Some(v), Some(orig)) = (lod, orig_lod) {
+			if (orig - v).abs() > 0.01 {
+				dev.set_lod(profile, v)?;
+				eprintln!("{label}: LOD: {orig}mm -> {v}mm");
+				changed = true;
+			}
 		}
-	}
-	if let (Some(d), Some(orig)) = (debounce, orig_debounce) {
-		if orig != d {
-			dev.set_debounce(profile, d)?;
-			eprintln!("Debounce: {orig}ms -> {d}ms");
+		if let (Some(d), Some(orig)) = (debounce, orig_debounce) {
+			if orig != d {
+				dev.set_debounce(profile, d)?;
+				eprintln!("{label}: Debounce: {orig}ms -> {d}ms");
+				changed = true;
+			}
 		}
-	}
+		Ok(changed)
+	};
 
-	let status = std::process::Command::new(&command[0])
-		.args(&command[1..])
-		.status();
+	let restore = |label: &str| -> Result<()> {
+		if let (Some(orig), Some(r)) = (orig_rate, rate) {
+			if orig != r {
+				dev.set_polling_rate(profile, orig)?;
+				eprintln!("{label}: Polling rate restored: {orig} Hz");
+			}
+		}
+		if let (Some(d), Some((active, ref stages))) = (dpi, &orig_dpi) {
+			let current = stages.get(*active as usize).map(|s| s.0).unwrap_or(0);
+			if current != d {
+				dev.set_dpi_stages(profile, stages)?;
+				eprintln!("{label}: DPI stages restored");
+			}
+		}
+		if let (Some(orig), Some(v)) = (orig_lod, lod) {
+			if (orig - v).abs() > 0.01 {
+				dev.set_lod(profile, orig)?;
+				eprintln!("{label}: LOD restored: {orig}mm");
+			}
+		}
+		if let (Some(orig), Some(d)) = (orig_debounce, debounce) {
+			if orig != d {
+				dev.set_debounce(profile, orig)?;
+				eprintln!("{label}: Debounce restored: {orig}ms");
+			}
+		}
+		Ok(())
+	};
 
-	if let (Some(orig), Some(r)) = (orig_rate, rate) {
-		if orig != r {
-			dev.set_polling_rate(profile, orig)?;
-			eprintln!("Polling rate restored: {orig} Hz");
-		}
-	}
-	if let (Some((_, ref stages)), true) = (&orig_dpi, dpi_changed) {
-		dev.set_dpi_stages(profile, stages)?;
-		eprintln!("DPI stages restored");
-	}
-	if let (Some(orig), Some(v)) = (orig_lod, lod) {
-		if (orig - v).abs() > 0.01 {
-			dev.set_lod(profile, orig)?;
-			eprintln!("LOD restored: {orig}mm");
-		}
-	}
-	if let (Some(orig), Some(d)) = (orig_debounce, debounce) {
-		if orig != d {
-			dev.set_debounce(profile, orig)?;
-			eprintln!("Debounce restored: {orig}ms");
-		}
-	}
+	if focus {
+		let mut child = std::process::Command::new(&command[0])
+			.args(&command[1..])
+			.spawn()?;
 
-	let code = status?.code().unwrap_or(1);
-	std::process::exit(code);
+		let child_pid = child.id();
+		eprintln!("Waiting for window (PID {child_pid})...");
+
+		let window_addr = {
+			let mut addr = None;
+			for _ in 0..50 {
+				std::thread::sleep(std::time::Duration::from_millis(200));
+				if let Some(status) = child.try_wait()? {
+					std::process::exit(status.code().unwrap_or(1));
+				}
+				match hyprland::find_window_by_pid(child_pid) {
+					Ok(a) => {
+						addr = Some(a);
+						break;
+					}
+					Err(_) => continue,
+				}
+			}
+			addr.ok_or_else(|| anyhow::anyhow!("timed out waiting for window to appear"))?
+		};
+
+		eprintln!("Tracking window {window_addr}, settings apply on focus");
+		let mut monitor = hyprland::FocusMonitor::new(window_addr)?;
+
+		loop {
+			if let Some(status) = child.try_wait()? {
+				if monitor.focused {
+					restore("Exit")?;
+				}
+				std::process::exit(status.code().unwrap_or(1));
+			}
+
+			if let Some(focused) = monitor.poll() {
+				if focused {
+					apply("Focused")?;
+				} else {
+					restore("Unfocused")?;
+				}
+			}
+		}
+	} else {
+		apply("Applied")?;
+
+		let status = std::process::Command::new(&command[0])
+			.args(&command[1..])
+			.status();
+
+		restore("Restored")?;
+
+		let code = status?.code().unwrap_or(1);
+		std::process::exit(code);
+	}
 }
 
 fn cmd_reset(path: Option<&str>) -> Result<()> {
