@@ -1,6 +1,7 @@
 mod cli;
 mod consts;
 mod device;
+#[cfg(unix)]
 mod hyprland;
 mod protocol;
 mod types;
@@ -524,47 +525,53 @@ fn cmd_wrap(
 	};
 
 	if focus {
-		let mut child = std::process::Command::new(&command[0])
-			.args(&command[1..])
-			.spawn()?;
+		#[cfg(not(unix))]
+		bail!("--focus requires Unix (Hyprland is not available on this platform)");
 
-		let child_pid = child.id();
-		eprintln!("Waiting for window (PID {child_pid})...");
+		#[cfg(unix)]
+		{
+			let mut child = std::process::Command::new(&command[0])
+				.args(&command[1..])
+				.spawn()?;
 
-		let window_addr = {
-			let mut addr = None;
-			for _ in 0..50 {
-				std::thread::sleep(std::time::Duration::from_millis(200));
+			let child_pid = child.id();
+			eprintln!("Waiting for window (PID {child_pid})...");
+
+			let window_addr = {
+				let mut addr = None;
+				for _ in 0..50 {
+					std::thread::sleep(std::time::Duration::from_millis(200));
+					if let Some(status) = child.try_wait()? {
+						std::process::exit(status.code().unwrap_or(1));
+					}
+					match hyprland::find_window_by_pid(child_pid) {
+						Ok(a) => {
+							addr = Some(a);
+							break;
+						}
+						Err(_) => continue,
+					}
+				}
+				addr.ok_or_else(|| anyhow::anyhow!("timed out waiting for window to appear"))?
+			};
+
+			eprintln!("Tracking window {window_addr}, settings apply on focus");
+			let mut monitor = hyprland::FocusMonitor::new(window_addr)?;
+
+			loop {
 				if let Some(status) = child.try_wait()? {
+					if monitor.focused {
+						restore("Exit")?;
+					}
 					std::process::exit(status.code().unwrap_or(1));
 				}
-				match hyprland::find_window_by_pid(child_pid) {
-					Ok(a) => {
-						addr = Some(a);
-						break;
+
+				if let Some(focused) = monitor.poll() {
+					if focused {
+						apply("Focused")?;
+					} else {
+						restore("Unfocused")?;
 					}
-					Err(_) => continue,
-				}
-			}
-			addr.ok_or_else(|| anyhow::anyhow!("timed out waiting for window to appear"))?
-		};
-
-		eprintln!("Tracking window {window_addr}, settings apply on focus");
-		let mut monitor = hyprland::FocusMonitor::new(window_addr)?;
-
-		loop {
-			if let Some(status) = child.try_wait()? {
-				if monitor.focused {
-					restore("Exit")?;
-				}
-				std::process::exit(status.code().unwrap_or(1));
-			}
-
-			if let Some(focused) = monitor.poll() {
-				if focused {
-					apply("Focused")?;
-				} else {
-					restore("Unfocused")?;
 				}
 			}
 		}
