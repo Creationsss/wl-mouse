@@ -52,7 +52,7 @@ description = "CLI tool for WLmouse gaming mice. Configure DPI, polling rate, LO
         let
           pkgs = pkgsFor system;
 
-          rustToolchain = pkgs.rust-bin.stable."1.92.0".default.override {
+          rustToolchain = pkgs.rust-bin.stable."1.96.0".default.override {
             extensions = [ "rust-src" "rust-analyzer" ];
           };
         in
