@@ -75,6 +75,18 @@ pub enum Commands {
 		value: Option<String>,
 	},
 
+	#[command(about = "Get or set high-speed mode (lower input lag, more battery drain)")]
+	HighSpeed {
+		#[arg(help = "Enable/disable (on/off)")]
+		value: Option<String>,
+	},
+
+	#[command(about = "Get or set turbo mode (fixed 20K FPS sensor, needs high-speed mode)")]
+	Turbo {
+		#[arg(help = "Enable/disable (on/off)")]
+		value: Option<String>,
+	},
+
 	#[command(about = "Get or set sleep time")]
 	SleepTime {
 		#[arg(help = "Sleep time in minutes (0 = never)")]
@@ -91,6 +103,10 @@ pub enum Commands {
 		lod: Option<f32>,
 		#[arg(long, help = "Debounce time in ms")]
 		debounce: Option<u8>,
+		#[arg(long, help = "Enable high-speed mode while running")]
+		high_speed: bool,
+		#[arg(long, help = "Enable turbo mode while running (implies --high-speed)")]
+		turbo: bool,
 		#[arg(
 			short,
 			long,

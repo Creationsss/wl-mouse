@@ -83,8 +83,11 @@ wl-mouse debounce 4
 wl-mouse angle-snap on
 wl-mouse motion-sync off
 wl-mouse ripple-control on
+wl-mouse high-speed on
+wl-mouse turbo on
 wl-mouse sleep-time 5
 wl-mouse sleep-time 0
+wl-mouse wrap --turbo -- some-game
 wl-mouse reset
 ```
 

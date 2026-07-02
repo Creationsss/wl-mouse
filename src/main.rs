@@ -60,12 +60,43 @@ fn main() -> Result<()> {
 			|d, p| d.ripple_control(p),
 			|d, p, v| d.set_ripple_control(p, v),
 		),
+		Commands::HighSpeed { value } => cmd_toggle(
+			cli.device.as_deref(),
+			"High-speed mode",
+			value,
+			cli.json,
+			|d, p| d.hyper_mode(p),
+			|d, p, v| {
+				if !v && d.turbo_mode(p).unwrap_or(false) {
+					d.set_turbo_mode(p, false)?;
+					eprintln!("Turbo mode set to off (requires high-speed mode)");
+				}
+				d.set_hyper_mode(p, v)
+			},
+		),
+		Commands::Turbo { value } => {
+			cmd_toggle(
+				cli.device.as_deref(),
+				"Turbo mode",
+				value,
+				cli.json,
+				|d, p| d.turbo_mode(p),
+				|d, p, v| {
+					if v && !d.hyper_mode(p)? {
+						bail!("turbo mode requires high-speed mode (run 'wl-mouse high-speed on' first)");
+					}
+					d.set_turbo_mode(p, v)
+				},
+			)
+		}
 		Commands::SleepTime { minutes } => cmd_sleep_time(cli.device.as_deref(), minutes, cli.json),
 		Commands::Wrap {
 			rate,
 			dpi,
 			lod,
 			debounce,
+			high_speed,
+			turbo,
 			focus,
 			command,
 		} => cmd_wrap(
@@ -74,6 +105,8 @@ fn main() -> Result<()> {
 			dpi,
 			lod,
 			debounce,
+			high_speed,
+			turbo,
 			focus,
 			&command,
 		),
@@ -153,6 +186,8 @@ fn cmd_profile(path: Option<&str>, id: Option<u8>, json: bool) -> Result<()> {
 	let sync = dev.motion_sync(profile).ok();
 	let tune = dev.angle_tune(profile).ok();
 	let ripple = dev.ripple_control(profile).ok();
+	let hyper = dev.hyper_mode(profile).ok();
+	let turbo = dev.turbo_mode(profile).ok();
 	let sleep = dev.sleep_time(profile).ok();
 
 	let info = ProfileInfo {
@@ -165,6 +200,8 @@ fn cmd_profile(path: Option<&str>, id: Option<u8>, json: bool) -> Result<()> {
 		motion_sync: sync,
 		angle_tune: tune,
 		ripple_control: ripple,
+		high_speed: hyper,
+		turbo,
 		sleep_time_seconds: sleep.map(normalize_sleep_time),
 	};
 
@@ -199,6 +236,14 @@ fn cmd_profile(path: Option<&str>, id: Option<u8>, json: bool) -> Result<()> {
 
 		if let Some(ripple) = info.ripple_control {
 			println!("  Ripple ctrl:   {}", if ripple { "on" } else { "off" });
+		}
+
+		if let Some(hs) = info.high_speed {
+			println!("  High-speed:    {}", if hs { "on" } else { "off" });
+		}
+
+		if let Some(turbo) = info.turbo {
+			println!("  Turbo:         {}", if turbo { "on" } else { "off" });
 		}
 
 		if let Some(sleep) = info.sleep_time_seconds {
@@ -425,20 +470,26 @@ fn cmd_sleep_time(path: Option<&str>, minutes: Option<u16>, json: bool) -> Resul
 	}
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_wrap(
 	path: Option<&str>,
 	rate: Option<u16>,
 	dpi: Option<u16>,
 	lod: Option<f32>,
 	debounce: Option<u8>,
+	high_speed: bool,
+	turbo: bool,
 	focus: bool,
 	command: &[String],
 ) -> Result<()> {
-	let rate = rate.or(if dpi.is_none() && lod.is_none() && debounce.is_none() {
-		Some(8000)
-	} else {
-		None
-	});
+	let high_speed = high_speed || turbo;
+	let rate = rate.or(
+		if dpi.is_none() && lod.is_none() && debounce.is_none() && !high_speed {
+			Some(8000)
+		} else {
+			None
+		},
+	);
 
 	if let Some(r) = rate {
 		if !matches!(r, 125 | 250 | 500 | 1000 | 2000 | 4000 | 8000) {
@@ -459,6 +510,8 @@ fn cmd_wrap(
 	let orig_dpi = dpi.map(|_| dev.dpi_stages(profile, 6)).transpose()?;
 	let orig_lod = lod.map(|_| dev.lod(profile)).transpose()?;
 	let orig_debounce = debounce.map(|_| dev.debounce(profile)).transpose()?;
+	let orig_high_speed = high_speed.then(|| dev.hyper_mode(profile)).transpose()?;
+	let orig_turbo = turbo.then(|| dev.turbo_mode(profile)).transpose()?;
 
 	let apply = |label: &str| -> Result<bool> {
 		let mut changed = false;
@@ -492,10 +545,28 @@ fn cmd_wrap(
 				changed = true;
 			}
 		}
+		if orig_high_speed == Some(false) {
+			dev.set_hyper_mode(profile, true)?;
+			eprintln!("{label}: High-speed mode: off -> on");
+			changed = true;
+		}
+		if orig_turbo == Some(false) {
+			dev.set_turbo_mode(profile, true)?;
+			eprintln!("{label}: Turbo mode: off -> on");
+			changed = true;
+		}
 		Ok(changed)
 	};
 
 	let restore = |label: &str| -> Result<()> {
+		if orig_turbo == Some(false) {
+			dev.set_turbo_mode(profile, false)?;
+			eprintln!("{label}: Turbo mode restored: off");
+		}
+		if orig_high_speed == Some(false) {
+			dev.set_hyper_mode(profile, false)?;
+			eprintln!("{label}: High-speed mode restored: off");
+		}
 		if let (Some(orig), Some(r)) = (orig_rate, rate) {
 			if orig != r {
 				dev.set_polling_rate(profile, orig)?;

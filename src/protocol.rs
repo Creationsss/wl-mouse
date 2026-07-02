@@ -323,6 +323,22 @@ pub fn build_set_angle_tune(profile: u8, value: i8) -> [u8; REPORT_SIZE] {
 	build_profile_set(0x02, 0x01, 0x14, profile, raw)
 }
 
+pub fn build_get_hyper_mode(profile: u8) -> [u8; REPORT_SIZE] {
+	build_profile_get(0x02, 0x01, 0x8B, profile)
+}
+
+pub fn build_set_hyper_mode(profile: u8, enabled: bool) -> [u8; REPORT_SIZE] {
+	build_profile_set(0x02, 0x01, 0x0B, profile, enabled as u8)
+}
+
+pub fn build_get_turbo_mode(profile: u8) -> [u8; REPORT_SIZE] {
+	build_profile_get(0x02, 0x01, 0x93, profile)
+}
+
+pub fn build_set_turbo_mode(profile: u8, enabled: bool) -> [u8; REPORT_SIZE] {
+	build_profile_set(0x02, 0x01, 0x13, profile, enabled as u8)
+}
+
 pub fn build_get_ripple_control(profile: u8) -> [u8; REPORT_SIZE] {
 	build_profile_get(0x02, 0x01, 0x8A, profile)
 }

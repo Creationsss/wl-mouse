@@ -225,6 +225,30 @@ impl Device {
 		Ok(())
 	}
 
+	pub fn hyper_mode(&self, profile: u8) -> Result<bool> {
+		let transport = self.transport();
+		let resp = transport.send_and_recv(&build_get_hyper_mode(profile))?;
+		Ok(resp_bool(&resp, transport.hid_index))
+	}
+
+	pub fn set_hyper_mode(&self, profile: u8, enabled: bool) -> Result<()> {
+		self.transport()
+			.send_and_recv(&build_set_hyper_mode(profile, enabled))?;
+		Ok(())
+	}
+
+	pub fn turbo_mode(&self, profile: u8) -> Result<bool> {
+		let transport = self.transport();
+		let resp = transport.send_and_recv(&build_get_turbo_mode(profile))?;
+		Ok(resp_bool(&resp, transport.hid_index))
+	}
+
+	pub fn set_turbo_mode(&self, profile: u8, enabled: bool) -> Result<()> {
+		self.transport()
+			.send_and_recv(&build_set_turbo_mode(profile, enabled))?;
+		Ok(())
+	}
+
 	pub fn ripple_control(&self, profile: u8) -> Result<bool> {
 		let transport = self.transport();
 		let resp = transport.send_and_recv(&build_get_ripple_control(profile))?;

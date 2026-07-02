@@ -45,6 +45,10 @@ pub struct ProfileInfo {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub ripple_control: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
+	pub high_speed: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub turbo: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub sleep_time_seconds: Option<u16>,
 }
 
