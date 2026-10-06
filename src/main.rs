@@ -1,3 +1,4 @@
+mod bootloader;
 mod cli;
 mod consts;
 mod device;
@@ -5,6 +6,7 @@ mod device;
 mod hyprland;
 mod protocol;
 mod types;
+mod update;
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -110,6 +112,7 @@ fn main() -> Result<()> {
 			focus,
 			&command,
 		),
+		Commands::Update { force, yes } => update::cmd_update(cli.device.as_deref(), force, yes),
 		Commands::Reset => cmd_reset(cli.device.as_deref()),
 	}
 }

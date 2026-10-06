@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::consts::*;
 
@@ -70,4 +70,58 @@ pub fn normalize_sleep_time(raw: u16) -> u16 {
 	} else {
 		raw
 	}
+}
+
+/// bl packet pacing to match web (ms).
+pub struct Delays {
+	pub program: u64,
+	pub program_4k: u64,
+	pub verify: u64,
+}
+
+impl Delays {
+	pub const MCU1: Delays = Delays {
+		program: 1,
+		program_4k: 1,
+		verify: 1,
+	};
+	pub const MCU2: Delays = Delays {
+		program: 4,
+		program_4k: 5,
+		verify: 5,
+	};
+}
+
+/// env-models.json
+#[derive(Deserialize, Default)]
+#[serde(default)]
+pub struct Model {
+	#[serde(rename = "ModelEN")]
+	pub model_en: String,
+	#[serde(rename = "FWFolder")]
+	pub fw_folder: String,
+	#[serde(rename = "PIDWired")]
+	pub pid_wired: String,
+	#[serde(rename = "DeviceBLVID")]
+	pub device_bl_vid: String,
+	#[serde(rename = "DeviceBLPID")]
+	pub device_bl_pid: String,
+	#[serde(rename = "DeviceFWFile_00")]
+	pub device_fw_00: String,
+	#[serde(rename = "DeviceFWFile_01")]
+	pub device_fw_01: String,
+	#[serde(rename = "ReceiverOneMcuMultiHex")]
+	pub one_mcu_multi_hex: String,
+	#[serde(rename = "_8KDongle")]
+	pub dongle_8k: String,
+	#[serde(rename = "_1KDongle")]
+	pub dongle_1k: String,
+	#[serde(rename = "Receiver4K8KBLVID")]
+	pub recv_bl_vid: String,
+	#[serde(rename = "Receiver4K8KBLPID")]
+	pub recv_bl_pid: String,
+	#[serde(rename = "Receiver4K8KFWFile_00")]
+	pub recv_fw_00: String,
+	#[serde(rename = "Receiver4K8KFWFile_01")]
+	pub recv_fw_01: String,
 }

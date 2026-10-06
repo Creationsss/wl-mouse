@@ -88,6 +88,7 @@ wl-mouse turbo on
 wl-mouse sleep-time 5
 wl-mouse sleep-time 0
 wl-mouse wrap --turbo -- some-game
+wl-mouse update
 wl-mouse reset
 ```
 

@@ -310,6 +310,23 @@ pub fn build_get_profile_id() -> [u8; REPORT_SIZE] {
 	buf
 }
 
+pub fn build_get_profile_count() -> [u8; REPORT_SIZE] {
+	let mut buf = [0u8; REPORT_SIZE];
+	buf[2] = 0x02;
+	buf[3] = 0x01;
+	buf[5] = 0x86;
+	buf
+}
+
+pub fn build_set_profile_id(id: u8) -> [u8; REPORT_SIZE] {
+	let mut buf = [0u8; REPORT_SIZE];
+	buf[2] = 0x02;
+	buf[3] = 0x01;
+	buf[5] = 0x05;
+	buf[6] = id;
+	buf
+}
+
 pub fn build_get_angle_tune(profile: u8) -> [u8; REPORT_SIZE] {
 	build_profile_get(0x02, 0x01, 0x94, profile)
 }
@@ -364,6 +381,14 @@ pub fn parse_sn(resp: &[u8; REPORT_SIZE], hid_index: u8) -> String {
 		.take_while(|&b| b != 0 && b != 0xFF && b.is_ascii_graphic())
 		.collect();
 	String::from_utf8_lossy(&bytes).to_string()
+}
+
+pub fn build_enter_bl(device_id: u8) -> [u8; REPORT_SIZE] {
+	let mut buf = [0u8; REPORT_SIZE];
+	buf[2] = device_id;
+	buf[3] = 0x01;
+	buf[6] = 0xB0;
+	buf
 }
 
 pub fn build_factory_reset() -> [u8; REPORT_SIZE] {

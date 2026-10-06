@@ -33,3 +33,15 @@ pub const KNOWN_PIDS: &[(u16, &str)] = &[
 pub const SLEEP_OFF: u16 = 0x0000;
 pub const SLEEP_DISABLED: u16 = 0xFF00; // 65280 (turbo mode)
 pub const SLEEP_MAX_VAL: u16 = 0xFFFF; // 65535
+
+pub const CONFIG_BASE: &str = "https://gm.wlmouse.gg/Config/";
+
+pub const BL_PAGE: u8 = 0xB0;
+pub const BL_CMD_ERASE: u8 = 0x01;
+pub const BL_CMD_PROGRAM: u8 = 0x02;
+pub const BL_CMD_EXIT: u8 = 0x04;
+pub const BL_CMD_GET_VER: u8 = 0x80;
+pub const BL_CMD_VERIFY: u8 = 0x83;
+pub const BL_STATUS_OK: u8 = 0xA1;
+pub const BL_STATUS_OK2: u8 = 0x02;
+pub const XOR_KEY: u8 = 0x55;

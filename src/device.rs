@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 use crate::consts::*;
 use crate::protocol::*;
@@ -275,6 +275,137 @@ impl Device {
 
 	pub fn factory_reset(&self) -> Result<()> {
 		self.transport().send_only(&build_factory_reset())?;
+		Ok(())
+	}
+
+	pub fn pid(&self) -> u16 {
+		self._pid
+	}
+
+	pub fn enter_bootloader(&self, device_id: u8) {
+		let _ = self.transport().send_only(&build_enter_bl(device_id));
+	}
+
+	pub fn profile_count(&self) -> Result<u8> {
+		let resp = self.transport().send_and_recv(&build_get_profile_count())?;
+		Ok(resp[(7 - self.hid_index) as usize])
+	}
+
+	pub fn set_active_profile(&self, id: u8) -> Result<()> {
+		self.transport().send_and_recv(&build_set_profile_id(id))?;
+		Ok(())
+	}
+}
+
+pub struct ProfileSnapshot {
+	profile: u8,
+	polling_rate: Option<u16>,
+	dpi: Option<(u8, Vec<(u16, u16)>)>,
+	lod: Option<f32>,
+	debounce: Option<u8>,
+	angle_snap: Option<bool>,
+	motion_sync: Option<bool>,
+	angle_tune: Option<i8>,
+	ripple_control: Option<bool>,
+	sleep_time: Option<u16>,
+	hyper_mode: Option<bool>,
+	turbo_mode: Option<bool>,
+}
+
+impl ProfileSnapshot {
+	fn take(dev: &Device, profile: u8) -> Self {
+		ProfileSnapshot {
+			profile,
+			polling_rate: dev.polling_rate(profile).ok(),
+			dpi: dev.dpi_stages(profile, 6).ok(),
+			lod: dev.lod(profile).ok(),
+			debounce: dev.debounce(profile).ok(),
+			angle_snap: dev.angle_snap(profile).ok(),
+			motion_sync: dev.motion_sync(profile).ok(),
+			angle_tune: dev.angle_tune(profile).ok(),
+			ripple_control: dev.ripple_control(profile).ok(),
+			sleep_time: dev.sleep_time(profile).ok(),
+			hyper_mode: dev.hyper_mode(profile).ok(),
+			turbo_mode: dev.turbo_mode(profile).ok(),
+		}
+	}
+
+	fn restore(&self, dev: &Device) -> Result<()> {
+		let p = self.profile;
+		if let Some(r) = self.polling_rate {
+			dev.set_polling_rate(p, r)?;
+		}
+		if let Some((active, stages)) = &self.dpi {
+			dev.set_dpi_stages(p, stages)?;
+			dev.set_active_dpi(p, active + 1)?;
+		}
+		if let Some(v) = self.lod {
+			dev.set_lod(p, v)?;
+		}
+		if let Some(v) = self.debounce {
+			dev.set_debounce(p, v)?;
+		}
+		if let Some(v) = self.angle_snap {
+			dev.set_angle_snap(p, v)?;
+		}
+		if let Some(v) = self.motion_sync {
+			dev.set_motion_sync(p, v)?;
+		}
+		if let Some(v) = self.angle_tune {
+			dev.set_angle_tune(p, v)?;
+		}
+		if let Some(v) = self.ripple_control {
+			dev.set_ripple_control(p, v)?;
+		}
+		if let Some(v) = self.sleep_time {
+			dev.set_sleep_time(p, v)?;
+		}
+		if let Some(v) = self.hyper_mode {
+			dev.set_hyper_mode(p, v)?;
+		}
+		if let Some(v) = self.turbo_mode {
+			dev.set_turbo_mode(p, v)?;
+		}
+		Ok(())
+	}
+}
+
+pub struct Snapshot {
+	pid: u16,
+	active_profile: u8,
+	profiles: Vec<ProfileSnapshot>,
+}
+
+impl Snapshot {
+	pub fn take(dev: &Device) -> Option<Self> {
+		let active_profile = dev.active_profile().ok()?;
+		let count = dev
+			.profile_count()
+			.ok()
+			.filter(|n| (1..=8).contains(n))
+			.unwrap_or(3);
+		let profiles = (1..=count).map(|p| ProfileSnapshot::take(dev, p)).collect();
+		Some(Snapshot {
+			pid: dev.pid(),
+			active_profile,
+			profiles,
+		})
+	}
+
+	pub fn profile_count(&self) -> usize {
+		self.profiles.len()
+	}
+
+	pub fn restore(&self) -> Result<()> {
+		let (_, _, path) = list_devices()?
+			.into_iter()
+			.find(|d| d.1 == self.pid)
+			.with_context(|| format!("device {:#06x} not found after update", self.pid))?;
+		let dev = Device::open(Some(&path))?;
+		for p in &self.profiles {
+			p.restore(&dev)?;
+		}
+		dev.set_active_profile(self.active_profile)?;
 		Ok(())
 	}
 }

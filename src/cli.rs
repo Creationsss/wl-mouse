@@ -117,6 +117,14 @@ pub enum Commands {
 		command: Vec<String>,
 	},
 
+	#[command(about = "Update firmware from gm.wlmouse.gg (mouse/dongle must be wired)")]
+	Update {
+		#[arg(long, help = "Reflash even if firmware is already up to date")]
+		force: bool,
+		#[arg(short, long, help = "Skip confirmation prompt")]
+		yes: bool,
+	},
+
 	#[command(about = "Factory reset the device")]
 	Reset,
 }
