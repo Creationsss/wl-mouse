@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*', '[0-9]*']
+  pull_request:
+
+env:
+  CARGO_HOME: ${{ github.workspace }}/.cargo
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    runs-on: docker
+    container:
+      image: rust:latest
+    steps:
+      - run: apt-get update -qq && apt-get install -y -qq nodejs git
+      - uses: actions/checkout@v4
+      - run: rustup component add rustfmt
+      - run: cargo fmt --check --verbose
+
+  clippy:
+    runs-on: docker
+    container:
+      image: rust:latest
+    steps:
+      - run: apt-get update -qq && apt-get install -y -qq nodejs git pkg-config libudev-dev
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cargo
+            target
+          key: clippy-${{ hashFiles('Cargo.lock') }}
+          restore-keys: clippy-
+      - run: rustup component add clippy
+      - run: cargo clippy --all-targets -- -D warnings
+
+  release:
+    runs-on: docker
+    container:
+      image: rust:latest
+    needs: [fmt, clippy]
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    steps:
+      - run: apt-get update -qq && apt-get install -y -qq nodejs git pkg-config libudev-dev
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cargo
+            target
+          key: release-${{ hashFiles('Cargo.lock') }}
+          restore-keys: release-
+      - run: cargo build --release
+      - name: package
+        run: |
+          strip target/release/wl-mouse
+          mkdir -p dist
+          cp target/release/wl-mouse dist/wl-mouse-linux-x86_64
+      - uses: https://code.forgejo.org/actions/forgejo-release@v2
+        with:
+          direction: upload
+          url: https://heliopolis.live
+          repo: ${{ github.repository }}
+          tag: ${{ github.ref_name }}
+          sha: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release-dir: dist
+          release-notes: "Release ${{ github.ref_name }}"
